@@ -1,5 +1,6 @@
 import igraph as ig
 import Arroyo_DCDG_PLUT as arroyo
+import GRAPH_CONFIG
 
 class IGraphConverter:
     """
@@ -184,7 +185,7 @@ class IGraphConverter:
 
 if __name__ == "__main__":
     # 1) AML laden
-    aml_file = r'ModVA_Mixer_incl_SensorNamingConvention_reduced.aml'
+    aml_file = GRAPH_CONFIG.AML_FILE_PATH
     dcdg = arroyo.DCDG_Class()
     dcdg.generate_graphfromAML(aml_file)
 

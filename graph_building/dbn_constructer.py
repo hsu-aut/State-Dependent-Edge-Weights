@@ -2,6 +2,7 @@ import igraph as ig
 from pgmpy.models import DynamicBayesianNetwork as DBN
 from graph_copy_for_dbn import IGraphConverter
 import Arroyo_DCDG_PLUT as arroyo
+import GRAPH_CONFIG
 
 
 class DBNConverter:
@@ -292,7 +293,7 @@ class DBNConverter:
 
 if __name__ == "__main__":
     # 1) AML laden
-    aml_file = r"ModVA_Mixer_incl_SensorNamingConvention_reduced.aml"
+    aml_file = GRAPH_CONFIG.AML_FILE_PATH
     dcdg = arroyo.DCDG_Class()
     dcdg.generate_graphfromAML(aml_file)
 
@@ -305,7 +306,7 @@ if __name__ == "__main__":
     )
 
     # 4) Knoten nach Typ aufteilen
-    param_carrier_list = ["Height", "Area", "Diameter", "Roughness", "HDiff", "PDropNom", "Rotational_Speed"]
+    param_carrier_list = ["Height", "Area", "Diameter", "Roughness", "HDiff", "PDropNom", "Rotational_Speed", "MFNominal"]
     params, sensors = converter.split_nodes_by_carrier(sub, param_carrier_list)
 
     # 5) DBN-Converter erzeugen und DBN bauen

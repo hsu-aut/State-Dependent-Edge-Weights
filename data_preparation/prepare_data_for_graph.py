@@ -92,12 +92,12 @@ if __name__ == "__main__":
         .reset_index(drop=True)
     )
 
+    combined[PARAMETER_CONFIG.ACTUATORS_FOR_MODI] = combined[PARAMETER_CONFIG.ACTUATORS_FOR_MODI].astype(int) # ist nur damit man reine 0/1 Werte hat und mit nem float nichts durcheiannder kommt
+
     mode_dfs = {
         "mode_" + "_".join(str(v) for v in mode_vals): group
         for mode_vals, group in combined.groupby(PARAMETER_CONFIG.ACTUATORS_FOR_MODI)
     }
 
-    print(mode_dfs.keys())
-
-    # und zum Beispiel die Größe einer einzelnen Gruppe abfragen:
-    print(mode_dfs['mode_0_0_0_0_0_0'].shape)
+    for col in mode_dfs:
+        print(f"  {col}: {mode_dfs[col].shape[0]} Zeilen")
