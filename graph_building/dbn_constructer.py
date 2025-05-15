@@ -46,7 +46,7 @@ class DBNConverter:
         self._raw_layout = self.sub.layout("fr")
         self._compute_scaled_layout((5000, 5000))
 
-    def _create_nodes(self, param_ids: list[int]):
+    def _create_nodes(self, sensor_ids: list[int], param_ids: list[int]):
         """
         Erzeugt im DBN:
          - für jeden Parameter-Knoten v in param_ids: genau einen Node (v,param) in Slice 0
@@ -57,7 +57,7 @@ class DBNConverter:
                 name = f"{v}(param)"
                 self.dyn.add_node((name, 0))
                 self.param_node_names[v] = (name, 0)
-            else:
+            elif v in sensor_ids:
                 name_t0 = f"{v}(t-1)"
                 name_t1 = f"{v}(t)"
                 self.dyn.add_node((name_t0, 0))
@@ -134,13 +134,13 @@ class DBNConverter:
          2. Sensor→Sensor Interslice-Kanten
          3. Parameter→Sensor Kanten in beiden Slices
         """
-        self._create_nodes(param_ids)
+        self._create_nodes(sensor_ids, param_ids)
         self._add_interslice_edges(sensor_ids)
         self._add_parameter_edges(param_ids)
         return self.dyn, self.inter_eid_map, self.param_eid_map
 
     # --------------------- Plotting --------------------
-    def _compute_scaled_layout(self, bbox: tuple[float, float] = (500, 500)):
+    def _compute_scaled_layout(self, bbox):
         layout = self._raw_layout.copy()
         layout.fit_into(bbox, keep_aspect_ratio=False)
         self._layout2d = layout.coords
@@ -150,7 +150,7 @@ class DBNConverter:
         filename: str = "dbn_plot.html",
         z_step: float = 1.0,
         marker_size: int = 6,
-        bbox: tuple[float, float] = (500, 500),
+        bbox: tuple[float, float] = (5000, 5000),
     ):
         import plotly.graph_objects as go
 
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     )
 
     # 4) Knoten nach Typ aufteilen
-    param_carrier_list = ["Height", "Area", "Diameter", "Roughness", "HDiff"]
+    param_carrier_list = ["Height", "Area", "Diameter", "Roughness", "HDiff", "PDropNom", "Rotational_Speed"]
     params, sensors = converter.split_nodes_by_carrier(sub, param_carrier_list)
 
     # 5) DBN-Converter erzeugen und DBN bauen

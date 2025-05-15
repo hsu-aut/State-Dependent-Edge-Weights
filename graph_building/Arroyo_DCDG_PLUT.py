@@ -11,7 +11,7 @@ import numpy as np
 import heapq
 import networkx as nx
 from pyvis.network import Network
-import Config
+#import Config
 
 
 class Valve:
@@ -1545,6 +1545,7 @@ class DCDG_Class:
 
 
 ######################### MAIN #########################
+"""
 if __name__ == "__main__":
     t0 = time.time()
     # Beispiel
@@ -1637,4 +1638,4 @@ if __name__ == "__main__":
     totaltime = t1 - t0
     print(f"Code-Ausführung dauerte: {totaltime} Sekunden")
     print("Der interaktive Graph wurde in 'interactive_graph.html' gespeichert.")
-    
+    """
