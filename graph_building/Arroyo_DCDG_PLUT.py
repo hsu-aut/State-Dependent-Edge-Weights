@@ -624,8 +624,8 @@ class DCDG_Class:
         self.apply_rule("Pressure", "PDropNom", strength=probability_indexes["PDropNom"], time_constant=0.0, effect_factor=1, findValves=False, rulenumber=31,
                         inverse=True, apply_carrier="PressureDropNominal")
         # MFlowNominal(k) -> Q(k) +0.99: Ein höherer Durchfluss erhöht den Durchfluss.
-        self.apply_rule("MFNominal", "Flow", strength=probability_indexes["MFNominal"], time_constant=0.0, effect_factor=1, searchpath=alarmpaths,
-                        findValves=False, rulenumber=32, inverse=True, apply_carrier='MFlowNominal')     
+        self.apply_rule("Flow", "MFNominal", strength=probability_indexes["MFNominal"], time_constant=0.0, effect_factor=1, searchpath=alarmpaths,
+                        findValves=False, rulenumber=32, inverse=True, apply_carrier='MFlowNominal')        
         ## Pumpen
         # Rotationsgeschwindigkeit(k) -> Q(k) +0.99: Eine höhere Rotationsgeschwindigkeit erhöht den Durchfluss.
         self.apply_rule("Rotational_Speed", "Flow", strength=probability_indexes["Rotational_Speed"], time_constant=0.0, effect_factor=1, searchpath=alarmpaths,
