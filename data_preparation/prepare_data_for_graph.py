@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import PARAMETER_CONFIG
+import MAPPING_DICT
 
 
 def read_changed_param(txt_path: str) -> tuple[str, float]:
@@ -28,10 +29,11 @@ def read_changed_param(txt_path: str) -> tuple[str, float]:
 def process_all_folders(root_dir: str) -> dict[str, pd.DataFrame]:
     """
     Durchläuft alle direkten Unterordner von root_dir,
-    liest CSV + TXT aus, hängt Parameter-Spalten an
-    und gibt pro Ordner ein fertiges DataFrame zurück.
+    liest CSV + TXT aus, wendet Spalten-Matching an,
+    hängt Parameter-Spalten an und gibt pro Ordner ein fertiges DataFrame zurück.
     """
     results = {}
+    sim_to_graph = {sim: graph for sim, graph in MAPPING_DICT.matching.items()}
     for sub in os.listdir(root_dir):
         folder = os.path.join(root_dir, sub)
         if not os.path.isdir(folder):
@@ -69,6 +71,9 @@ def process_all_folders(root_dir: str) -> dict[str, pd.DataFrame]:
             # falls der Param-Name zufällig schon Spalte ist, überschreiben
             df[changed_name] = changed_val
 
+        # --- Spalten umbenennen gemäß matching ---
+        df.rename(columns=sim_to_graph, inplace=True)
+
         # e) speichern im Ergebnis-Dict
         results[sub] = df
 
@@ -92,12 +97,14 @@ if __name__ == "__main__":
         .reset_index(drop=True)
     )
 
-    combined[PARAMETER_CONFIG.ACTUATORS_FOR_MODI] = combined[PARAMETER_CONFIG.ACTUATORS_FOR_MODI].astype(int) # ist nur damit man reine 0/1 Werte hat und mit nem float nichts durcheiannder kommt
+    combined[PARAMETER_CONFIG.ACTUATORS_FOR_MODI] = combined[
+        PARAMETER_CONFIG.ACTUATORS_FOR_MODI
+    ].astype(
+        int
+    )  # ist nur damit man reine 0/1 Werte hat und mit nem float nichts durcheiannder kommt
 
     mode_dfs = {
         "mode_" + "_".join(str(v) for v in mode_vals): group
         for mode_vals, group in combined.groupby(PARAMETER_CONFIG.ACTUATORS_FOR_MODI)
     }
 
-    for col in mode_dfs:
-        print(f"  {col}: {mode_dfs[col].shape[0]} Zeilen")
