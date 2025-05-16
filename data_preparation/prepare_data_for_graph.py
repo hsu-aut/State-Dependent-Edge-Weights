@@ -108,3 +108,11 @@ if __name__ == "__main__":
         for mode_vals, group in combined.groupby(PARAMETER_CONFIG.ACTUATORS_FOR_MODI)
     }
 
+    out_dir = r"Data/mode_parquets"
+    os.makedirs(out_dir, exist_ok=True)
+
+    #Jede Mode-DataFrame separat speichern
+    for mode_name, df_mode in mode_dfs.items():
+        file_path = os.path.join(out_dir, f"{mode_name}.parquet")
+        df_mode.to_parquet(file_path, index=False)
+        print(f"✓ {mode_name} gespeichert in {file_path!r}")

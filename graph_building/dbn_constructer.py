@@ -290,6 +290,21 @@ class DBNConverter:
         fig.write_html(filename)
         print(f"Interaktiver 3D-Plot gespeichert: {filename}")
 
+    
+    # --------------------- DBN-Checks --------------------
+    def check_dbn_with_igraph(self, dbn):
+        # 1) Knoten indizieren
+        nodes = list(dbn.nodes())
+        idx = {n: i for i, n in enumerate(nodes)}
+        # 2) Graph anlegen und Kanten hinzufügen
+        g = ig.Graph(directed=True)
+        g.add_vertices(len(nodes))
+        edges = [(idx[u], idx[v]) for u, v in dbn.edges()]
+        g.add_edges(edges)
+        # 3) Checks
+        assert g.is_directed(), "Graph ist nicht gerichtet!"
+        assert g.is_dag(), "Graph enthält mindestens einen Zyklus!"
+        print("OK: DBN ist gerichtet und azyklisch.")
 
 if __name__ == "__main__":
     # 1) AML laden
@@ -312,6 +327,8 @@ if __name__ == "__main__":
     # 5) DBN-Converter erzeugen und DBN bauen
     dbn_converter = DBNConverter(sub, vid_map_sub, eid_map_sub, converter)
     model, inter_map, param_map = dbn_converter.build(sensors, params)
+
+    dbn_converter.check_dbn_with_igraph(model)
 
     # 6) Optional: interaktiven Plot speichern
     dbn_converter.plot_interactive(filename="dbn_plot.html", z_step=10.0, marker_size=8)
