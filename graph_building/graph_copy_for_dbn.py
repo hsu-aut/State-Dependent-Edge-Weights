@@ -1,6 +1,6 @@
 import igraph as ig
 import Arroyo_DCDG_PLUT as arroyo
-import GRAPH_CONFIG
+import GRAPH_CONFIG as GRAPH_CONFIG
 
 class IGraphConverter:
     """
@@ -195,13 +195,7 @@ if __name__ == "__main__":
     # 2) Sub-Graph ohne 'hierarch'-Knoten holen
     sub, vid_map_sub, eid_map_sub = converter.get_filtered_subgraph_with_mapping('hierarch', True)
 
-    param_carrier_list = ["Height", "Area", "Diameter", "Roughness", "HDiff"]
+    param_carrier_list = ["Height", "Area", "Diameter", "Roughness", "HDiff", "PDropNom", "Rotational_Speed", "MFNominal"]
     params, sensors = converter.split_nodes_by_carrier(sub, param_carrier_list)
     
-    layout = converter.g.layout(layout="auto")
-    ig.plot(converter.g, layout=layout, bbox=(0,0,5600,5600), vertex_label=converter.g.vs["Tag"], vertex_size=20, edge_width=0.5, target="myfile.pdf")
-
-    layout = sub.layout(layout="auto")
-    ig.plot(sub, layout=layout, bbox=(0,0,5600,5600), vertex_label=sub.vs["Tag"], vertex_size=20, edge_width=0.5, target="myfile_sub.pdf")
-
 

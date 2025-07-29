@@ -5,7 +5,7 @@ matching = {
     "B201_Pressure":            "tank_B201.ports[1].p",
     "B201_Height":              "tank_B201.height",
     "B201_Area":                "tank_B201.crossArea",
-    "LIR211_Measurement_Level": "none",  
+    "LIR211_Measurement_Level": "tank_B201.level",  
 
     # Rohr B201_V201: Durchfluss, Druck, Temperatur, Länge, Durchmesser, Rauheit, Höhenunterschied
     "Pipe_B201_V201_Flow":      "pipe_B201_V201.port_a.m_flow",
@@ -234,14 +234,14 @@ matching = {
     "Tee4_Temperature": "Tee4.medium.T",
     "Tee4_Pressure":    "Tee4.medium.p",
     
-    # Rohr Tee4 – V204
-    "Pipe_Tee4_V204_Flow":      "pipe_Tee4_V204.port_a.m_flow",
-    "Pipe_Tee4_V204_Pressure":  "pipe_Tee4_V204.port_b.p",
-    "Pipe_Tee4_V204_Temperature": "pipe_Tee4_V204.flowModel.states[1].T",
-    "Pipe_Tee4_V204_Length":    "pipe_Tee4_V204.length",
-    "Pipe_Tee4_V204_Diameter":  "pipe_Tee4_V204.diameter",
-    "Pipe_Tee4_V204_Roughness": "pipe_Tee4_V204.roughness",
-    "Pipe_Tee4_V204_HDiff":     "pipe_Tee4_V204.height_ab",
+    # Rohr Tee4 – V204 (hier ist etwas in der Simulation durcheinander geraten in der sim heißt es V204 müsste aber eigentlich V206 sein)
+    "Pipe_Tee4_V206_Flow":      "pipe_Tee4_V204.port_a.m_flow",
+    "Pipe_Tee4_V206_Pressure":  "pipe_Tee4_V204.port_b.p",
+    "Pipe_Tee4_V206_Temperature": "pipe_Tee4_V204.flowModel.states[1].T",
+    "Pipe_Tee4_V206_Length":    "pipe_Tee4_V204.length",
+    "Pipe_Tee4_V206_Diameter":  "pipe_Tee4_V204.diameter",
+    "Pipe_Tee4_V206_Roughness": "pipe_Tee4_V204.roughness",
+    "Pipe_Tee4_V206_HDiff":     "pipe_Tee4_V204.height_ab",
     
     # Rohr Tee4 – Tee5
     "Pipe_Tee4_Tee5_Flow":      "pipe_Tee4_Tee5.port_a.m_flow",
@@ -285,14 +285,14 @@ matching = {
     "Pipe_Tee5_V205_Roughness": "pipe_Tee5_V205.roughness",
     "Pipe_Tee5_V205_HDiff":     "pipe_Tee5_V205.height_ab",
     
-    # Rohr Tee5 – V206
-    "Pipe_Tee5_V206_Flow":      "pipe_Tee5_V206.port_a.m_flow",
-    "Pipe_Tee5_V206_Pressure":  "pipe_Tee5_V206.port_b.p",
-    "Pipe_Tee5_V206_Temperature": "pipe_Tee5_V206.flowModel.states[1].T",
-    "Pipe_Tee5_V206_Length":    "pipe_Tee5_V206.length",
-    "Pipe_Tee5_V206_Diameter":  "pipe_Tee5_V206.diameter",
-    "Pipe_Tee5_V206_Roughness": "pipe_Tee5_V206.roughness",
-    "Pipe_Tee5_V206_HDiff":     "pipe_Tee5_V206.height_ab",
+    # Rohr Tee5 – V206 (hier als pipe_Tee5_V206 in der Simulation benannt und nicht als V204 was es eigentlich sein sollte)
+    "Pipe_Tee5_V204_Flow":      "pipe_Tee5_V206.port_a.m_flow",
+    "Pipe_Tee5_V204_Pressure":  "pipe_Tee5_V206.port_b.p",
+    "Pipe_Tee5_V204_Temperature": "pipe_Tee5_V206.flowModel.states[1].T",
+    "Pipe_Tee5_V204_Length":    "pipe_Tee5_V206.length",
+    "Pipe_Tee5_V204_Diameter":  "pipe_Tee5_V206.diameter",
+    "Pipe_Tee5_V204_Roughness": "pipe_Tee5_V206.roughness",
+    "Pipe_Tee5_V204_HDiff":     "pipe_Tee5_V206.height_ab",
     
     # Ventil V204
     "V204_State":       "V204.opening",
@@ -321,10 +321,12 @@ matching = {
     "Pipe_V205_B202_Roughness": "pipe_V205_B202.roughness",
     "Pipe_V205_B202_HDiff":     "pipe_V205_B202.height_ab",
     
-    # Rohr V204 – B201
+    # Rohr V204 – B201 (hier auch wieder falsche ZUordnung wer zum fick hat das gemacht)
     "Pipe_V204_B201_Flow":      "pipe_V206_B201.port_a.m_flow",
     "Pipe_V204_B201_Pressure":  "pipe_V206_B201.port_b.p",
     "Pipe_V204_B201_Temperature": "pipe_V206_B201.flowModel.states[1].T",
+    "Pipe_V204_B201_Length":    "pipe_V206_B201.length",
+    "Pipe_V204_B201_Diameter":  "pipe_V206_B201.diameter",
     "Pipe_V204_B201_Roughness": "pipe_V206_B201.roughness",
     "Pipe_V204_B201_HDiff":     "pipe_V206_B201.height_ab",
     

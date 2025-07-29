@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 import time
 from OMPython import OMCSessionZMQ, ModelicaSystem
 from SIMULATION_CONFIG import (
@@ -22,7 +23,7 @@ sweep_sets = np.load(
     os.path.join(ROOT_DIR, "Data", "parameter_combination.npy"), allow_pickle=True
 )
 
-task_id = 1
+task_id = int(os.environ.get("SLURM_ARRAY_TASK_ID", "0"))
 param_name, sweep_values, baseline = sweep_sets[task_id]
 
 omc = OMCSessionZMQ()
@@ -56,6 +57,12 @@ try:
 
         if not os.path.isfile(abs_csv):
             raise FileNotFoundError(f"Simulation result file {abs_csv} not found.")
+        
+        df = pd.read_csv(abs_csv)
+        parquet_path = abs_csv.replace(".csv", ".parquet")
+        df.to_parquet(parquet_path, compression="gzip", index=False)
+        os.remove(abs_csv)
+        print(f"✓ {run_name} gespeichert in {parquet_path}")
 
         with open(os.path.join(out_dir, "parameters.txt"), "w") as f:
             f.write(f"Geändert: {param_name}\nWert: {val}\n")

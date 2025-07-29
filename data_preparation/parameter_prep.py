@@ -17,7 +17,7 @@ def generate_sweep_sets(nominals: dict, parameters_range: dict):
 
 
 if __name__ == "__main__":
-    parameters = parameter_values.parameters
+    parameters = parameter_values.parameters_gaussian
     sweep_sets = generate_sweep_sets(PARAMETER_CONFIG.NOMINALS, parameters)
     sweep_array = np.empty(len(sweep_sets), dtype=object)
     sweep_array[:] = sweep_sets
