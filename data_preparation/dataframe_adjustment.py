@@ -167,19 +167,23 @@ def process_test_case(args_tuple: Tuple[Path, Path, Path]) -> Tuple[int, int]:
     sensor_residual_df = df_residual[sensor_columns_to_keep].copy()
 
     # 9) Erstellen und Speichern von modi_df (falls relevanten Spalten vorhanden)
-    modi_df_source_columns = [col for col in ACTUATORS_FOR_MODI if col in df_faulty.columns]
-    modi_df = None
-    if modi_df_source_columns:
-        modi_df_intermediate = df_faulty[modi_df_source_columns].copy()
-        if df_original_harm is not None:
-            modi_df = modi_df_intermediate.reindex(df_original_harm.index)
-            print(f"INFO: modi_df mit Spalten {modi_df_source_columns} für Testfall '{test_case_name}' erstellt.")
-            modi_df = modi_df.reset_index(drop=True)
-        else:
-            print(f"FEHLER: df_original_harm nicht verfügbar für Reindizierung von modi_df für '{test_case_name}'.")
-    else:
-        print(f"INFO: Keine Spalten aus ACTUATORS_FOR_MODI im df_faulty für '{test_case_name}' gefunden. modi_df wird nicht erstellt.")
+    modi_df_columns = [col for col in ACTUATORS_FOR_MODI if col in actuator_df.columns]
 
+    if modi_df_columns:
+        # Erstelle eine Kopie der relevanten Spalten aus dem funktionierenden actuator_df
+        modi_df = actuator_df[modi_df_columns].copy()
+
+        # WICHTIG: actuator_df enthält normalisierte Werte (0-100).
+        # Wir müssen diese in binäre Werte (0 oder 1) umwandeln.
+        # Annahme: Jeder Wert größer als 0 bedeutet "an" (1).
+        modi_df[modi_df > 0] = 1
+        modi_df = modi_df.astype(int)
+        
+        print(f"INFO: modi_df erfolgreich aus actuator_df mit Spalten {modi_df_columns} erstellt.")
+    else:
+        modi_df = None # Setze es explizit auf None, falls keine Spalten gefunden wurden
+        print(f"WARNUNG: Keine der Spalten für modi_df in actuator_df gefunden. modi_df wird nicht erstellt.")
+    
     # 10) Ausgabeordner für diesen Testfall anlegen
     output_testcase_specific_folder = output_base_folder / test_case_name
     output_testcase_specific_folder.mkdir(parents=True, exist_ok=True)

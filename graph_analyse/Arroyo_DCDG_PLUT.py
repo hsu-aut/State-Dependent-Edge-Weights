@@ -11,7 +11,7 @@ import numpy as np
 import heapq
 import networkx as nx
 from pyvis.network import Network
-import Config
+#import Config
 
 
 class Valve:
@@ -224,6 +224,33 @@ class DCDG_Class:
         self.NumberOfElements = 0
         # Leeren, gerichteten Graphen anlegen
         self.g = ig.Graph(intVertexNumber, directed=True)
+        
+    def update_edge_weights_from_mode(self, weights_df):
+        """
+        Aktualisiert die Kantengewichte des Graphen basierend auf einem DataFrame
+        für den aktuellen Betriebsmodus.
+        """
+    
+    
+        # Iteriere direkt über die Zeilen des Gewichts-DataFrames.
+        # 'original_edge_id' ist hier der Index des DataFrames.
+        for original_edge_id, row in weights_df.iterrows():
+            try:
+                # Lese die neuen Gewichte aus der aktuellen Zeile
+                new_weight = row['MI_mit_Var_Xi']
+                new_mi = row['MI_mit_Var_Xi']
+    
+                # Greife direkt über den Index auf die Kante im Graphen zu
+                # und aktualisiere ihre Attribute.
+                edge = self.g.es[original_edge_id]
+                edge['weight'] = new_weight
+    
+            except IndexError:
+                # print(f"Warnung: Kanten-ID {original_edge_id} existiert nicht im Graphen.")
+                pass
+            except KeyError:
+                # print(f"Warnung: Spalten für Kante {original_edge_id} nicht vollzählig.")
+                pass
 
     def add_myvertex(self, in_tag, in_carriertype, in_amlID, in_alarmtag, in_alarmstate, in_alarmlimits, in_deviation):
         """
@@ -625,7 +652,7 @@ class DCDG_Class:
                         inverse=True, apply_carrier="PressureDropNominal")
         # MFlowNominal(k) -> Q(k) +0.99: Ein höherer Durchfluss erhöht den Durchfluss.
         self.apply_rule("Flow", "MFNominal", strength=probability_indexes["MFNominal"], time_constant=0.0, effect_factor=1, searchpath=alarmpaths,
-                                findValves=False, rulenumber=32, inverse=True, apply_carrier='MFlowNominal')        
+                        findValves=False, rulenumber=32, inverse=True, apply_carrier='MFlowNominal')        
         ## Pumpen
         # Rotationsgeschwindigkeit(k) -> Q(k) +0.99: Eine höhere Rotationsgeschwindigkeit erhöht den Durchfluss.
         self.apply_rule("Rotational_Speed", "Flow", strength=probability_indexes["Rotational_Speed"], time_constant=0.0, effect_factor=1, searchpath=alarmpaths,
@@ -1545,6 +1572,7 @@ class DCDG_Class:
 
 
 ######################### MAIN #########################
+"""
 if __name__ == "__main__":
     t0 = time.time()
     # Beispiel
@@ -1637,4 +1665,4 @@ if __name__ == "__main__":
     totaltime = t1 - t0
     print(f"Code-Ausführung dauerte: {totaltime} Sekunden")
     print("Der interaktive Graph wurde in 'interactive_graph.html' gespeichert.")
-    
+    """

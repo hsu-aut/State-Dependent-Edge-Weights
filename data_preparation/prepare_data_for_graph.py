@@ -46,9 +46,13 @@ def read_changed_param(txt_path: str) -> tuple[str, float]:
     return param_name, param_val
 
 
-def process_all_folders(root_dir: str, output_base_dir: str):
-    print(f"Starte globale Verarbeitung der Ordner in: {root_dir}")
-    all_processed_dfs = [] # Liste für die optimierten DataFrames jedes Unterordners
+# ANGEPASSTE Funktion: process_and_save_intermediates
+def process_and_save_intermediates(root_dir: str, intermediate_output_dir: str):
+    print(f"Starte Stufe 1: Vorverarbeitung und Speichern von Zwischenergebnissen.")
+    print(f"Eingabeverzeichnis: {root_dir}")
+    print(f"Ausgabe der Zwischendateien nach: {intermediate_output_dir}")
+
+    os.makedirs(intermediate_output_dir, exist_ok=True) # Stelle sicher, dass das Verzeichnis existiert
 
     sim_to_graph = defaultdict(list)
     for graph, sim in MAPPING_DICT.matching.items():
@@ -79,153 +83,99 @@ def process_all_folders(root_dir: str, output_base_dir: str):
 
             changed_name, changed_val = read_changed_param(txt_path)
 
-            # --- ANPASSUNG HIER: Parameter effizient hinzufügen ---
             params_to_assign = {}
             for param, nom_val in PARAMETER_CONFIG.NOMINALS.items():
                 params_to_assign[param] = nom_val
             for para, val in PARAMETER_CONFIG.NOMINALS_NOT_FOR_SIMULATION.items():
                 params_to_assign[para] = val
             params_to_assign[changed_name] = changed_val
-            df = df.assign(**params_to_assign)
-            gc.collect() 
-            # --- ENDE ANPASSUNG --- 
-
-            # Spaltenauswahl und -umbenennung basierend auf MAPPING_DICT
-            # Ziel: Nur die absolut notwendigen Daten für df_processed extrahieren
-            final_columns_data = {}
-            # 1. Gemappte Simulationsdaten
-            for sim_col, graph_cols in sim_to_graph.items():
-                if sim_col in df.columns:
-                    for graph_col in graph_cols:
-                        # .values extrahiert NumPy Array, Typ sollte von optimiertem df stammen
-                        final_columns_data[graph_col] = df[sim_col].values 
             
-            # 2. Zeitspalte
+            df = df.assign(**params_to_assign)
+            gc.collect()
+
+            final_columns_data = {}
+            for sim_col, graph_cols_list in sim_to_graph.items():
+                if sim_col in df.columns:
+                    for graph_col_item in graph_cols_list:
+                        final_columns_data[graph_col_item] = df[sim_col].values 
+            
             if "time" in df.columns:
                 final_columns_data["time"] = df["time"].values
             else:
                 print(f"  WARNUNG: Spalte 'time' nicht gefunden in {parquet_path} für {sub}.")
 
-            # 3. Parameter-Spalten
             param_column_names = list(PARAMETER_CONFIG.NOMINALS.keys()) + \
                                  list(PARAMETER_CONFIG.NOMINALS_NOT_FOR_SIMULATION.keys()) + \
                                  [changed_name]
             for p_col in param_column_names:
-                if p_col in df.columns: # Stellt sicher, dass Spalte existiert
+                if p_col in df.columns:
                     final_columns_data[p_col] = df[p_col].values
             
-            # Index für das neue DataFrame
             original_index = df.index
-
-            # Ursprüngliches df wird nun nicht mehr direkt benötigt
             del df
             gc.collect()
 
-            # Erzeuge das "schlanke" df_processed DataFrame
-            # Die Typen der Arrays in final_columns_data sollten bereits optimiert sein.
             df_processed = pd.DataFrame(final_columns_data, index=original_index)
-            
             df_processed = optimize_df_dtypes(df_processed, f"df_processed_{sub}")
-            gc.collect()
 
-            all_processed_dfs.append(df_processed)
-            print(f"  ✓ Verarbeitet und für Kombination optimiert: {sub}")
+            # WICHTIG: Konvertiere ACTUATORS_FOR_MODI Spalten zu int BEVOR sie gespeichert werden
+            actuator_cols_to_convert = [col for col in PARAMETER_CONFIG.ACTUATORS_FOR_MODI if col in df_processed.columns]
+            if len(actuator_cols_to_convert) == len(PARAMETER_CONFIG.ACTUATORS_FOR_MODI):
+                try:
+                    df_processed[actuator_cols_to_convert] = df_processed[actuator_cols_to_convert].astype(int)
+                except ValueError as e:
+                    print(f"WARNUNG ({sub}): Konnte Aktuator-Spalten in df_processed nicht zu int konvertieren. Fehler: {e}.")
+            else:
+                missing_act_cols = set(PARAMETER_CONFIG.ACTUATORS_FOR_MODI) - set(df_processed.columns)
+                print(f"WARNUNG ({sub}): Nicht alle Aktuator-Spalten ({missing_act_cols}) für Typkonvertierung in df_processed gefunden.")
+            
+            # Speichere das optimierte df_processed als einzelne Parquet-Datei
+            # Verwende einen eindeutigen Präfix oder Suffix für diese Zwischendateien
+            intermediate_file_path = os.path.join(intermediate_output_dir, f"intermediate__{sub}.parquet")
+            df_processed.to_parquet(intermediate_file_path, index=False) # index=False ist üblich
+            print(f"  ✓ Zwischenergebnis gespeichert: {intermediate_file_path}")
+
+            del df_processed # Speicher sofort freigeben
+            gc.collect()
 
         except FileNotFoundError:
             print(f"  → Überspringe {sub}: Datei nicht gefunden.")
         except ValueError as e:
             print(f"  → Überspringe {sub}: ValueError beim Verarbeiten: {e}")
         except Exception as e:
-            print(f"  → Überspringe {sub}: Unerwarteter Fehler: {e}")
+            print(f"  → FEHLER beim Verarbeiten von {sub}: {e} (Typ: {type(e).__name__})")
 
-    if not all_processed_dfs:
-        print("Keine Daten verarbeitet, nichts zu kombinieren und speichern.")
-        return
+    print("\nStufe 1: Vorverarbeitung und Speichern aller Zwischenergebnisse abgeschlossen.")
 
-    print(f"\nKombiniere {len(all_processed_dfs)} optimierte DataFrames...")
-    try:
-        combined = pd.concat(all_processed_dfs, ignore_index=True, copy=False)
-    except MemoryError:
-        print("FATAL: MemoryError während pd.concat! Nicht genügend Speicher, um alle DataFrames zu kombinieren.")
-        del all_processed_dfs
-        gc.collect()
-        return # Abbruch
-    except Exception as e:
-        print(f"FATAL: Unerwarteter Fehler während pd.concat: {e}")
-        del all_processed_dfs
-        gc.collect()
-        return # Abbruch
-
-    del all_processed_dfs
-    gc.collect()
-
-    print("Optimiere Datentypen des finalen kombinierten DataFrames...")
-    combined = optimize_df_dtypes(combined, "combined_df_final")
-    gc.collect()
-
-    print("Konvertiere Aktuator-Spalten zu Integer im kombinierten DataFrame...")
-    actuator_cols_to_convert = [col for col in PARAMETER_CONFIG.ACTUATORS_FOR_MODI if col in combined.columns]
-    if len(actuator_cols_to_convert) != len(PARAMETER_CONFIG.ACTUATORS_FOR_MODI):
-        missing = set(PARAMETER_CONFIG.ACTUATORS_FOR_MODI) - set(actuator_cols_to_convert)
-        print(f"WARNUNG: Nicht alle Aktuator-Spalten ({missing}) für Typkonvertierung im kombinierten DataFrame gefunden.")
+if __name__ == "__main__":
+    # Pfade für den Cluster
+    root_dir_to_process = "/beegfs/project/ma-kausalegraphen/"
+    # NEU: Ein Verzeichnis für die zwischengespeicherten, optimierten Parquet-Dateien
+    intermediate_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/intermediate_parquets/"
     
-    if actuator_cols_to_convert:
-        try:
-            combined[actuator_cols_to_convert] = combined[actuator_cols_to_convert].astype(int)
-        except ValueError as e:
-            print(f"WARNUNG: Konnte Aktuator-Spalten nicht zu int konvertieren. Fehler: {e}. Sind NaNs oder nicht-numerische Werte vorhanden?")
-        except Exception as e:
-            print(f"FEHLER beim Konvertieren der Aktuator-Spalten zu int: {e}")
-    else:
-        print("Keine Aktuator-Spalten zum Konvertieren gefunden.")
+    # Das finale Ausgabeverzeichnis wird dann vom Dask-Skript verwendet
+    # final_output_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/mode_parquets_final/"
 
-
-    print("Gruppiere nach Modes und speichere Ergebnisse...")
-    os.makedirs(output_base_dir, exist_ok=True)
+    print(f"Starte Skript prepare_data_for_graph.py (Stufe 1 - Zwischenergebnisse)")
     
-    grouping_cols = [col for col in PARAMETER_CONFIG.ACTUATORS_FOR_MODI if col in combined.columns]
-    if not grouping_cols or len(grouping_cols) != len(PARAMETER_CONFIG.ACTUATORS_FOR_MODI):
-        print(f"WARNUNG: Grouping-Spalten ({PARAMETER_CONFIG.ACTUATORS_FOR_MODI}) nicht (vollständig) im kombinierten DataFrame vorhanden. Vorhanden: {grouping_cols}. Speichere ungruppiert.")
-        file_path = os.path.join(output_base_dir, "combined_ungrouped_data.parquet")
-        combined.to_parquet(file_path, index=False)
-        print(f"✓ Ungruppierte kombinierte Daten gespeichert in {file_path!r}")
-    else:
-        try:
-            for mode_vals, group_df in combined.groupby(grouping_cols, dropna=False):
-                mode_name = "mode_"
-                if isinstance(mode_vals, tuple): # Mehrere Grouping-Spalten
-                    mode_name += "_".join(str(v) for v in mode_vals)
-                else: # Eine Grouping-Spalte
-                    mode_name += str(mode_vals)
-                
-                file_path = os.path.join(output_base_dir, f"{mode_name}.parquet")
-                group_df.to_parquet(file_path, index=False)
-                print(f"✓ {mode_name} gespeichert in {file_path!r}")
-        except KeyError as e:
-            print(f"FEHLER beim Grouping (KeyError): {e}. Überprüfen Sie die Spaltennamen in PARAMETER_CONFIG.ACTUATORS_FOR_MODI.")
-            # Speichere das ungruppierte DataFrame als Fallback
-            fallback_path = os.path.join(output_base_dir, "combined_grouping_key_error.parquet")
-            combined.to_parquet(fallback_path, index=False)
-            print(f"✓ Kombinierte Daten (KeyError beim Grouping) gespeichert in {fallback_path!r}")
-        except Exception as e:
-            print(f"FEHLER beim Grouping oder Speichern der Modes: {e}")
-            fallback_path = os.path.join(output_base_dir, "combined_grouping_processing_error.parquet")
-            combined.to_parquet(fallback_path, index=False)
-            print(f"✓ Kombinierte Daten (Allg. Fehler beim Grouping) gespeichert in {fallback_path!r}")
-
-    del combined
-    gc.collect()
-    print("Globale Verarbeitung abgeschlossen.")
+    # Rufe die modifizierte Funktion auf
+    process_and_save_intermediates(root_dir_to_process, intermediate_directory)
+    
+    print("Skript prepare_data_for_graph.py (Stufe 1) beendet.")
 
 
 if __name__ == "__main__":
-    root_dir_to_process = r"C:\Users\Moritz\Desktop\Master\Code\Test_Data"
+    # Pfade für den Cluster
+    root_dir_to_process = "/beegfs/project/ma-kausalegraphen/"
+    # NEU: Ein Verzeichnis für die zwischengespeicherten, optimierten Parquet-Dateien
+    intermediate_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/intermediate_parquets/"
     
-    output_directory = r"C:\Users\Moritz\Desktop\Master\Code\Data\mode_parquets"
+    # Das finale Ausgabeverzeichnis wird dann vom Dask-Skript verwendet
+    # final_output_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/mode_parquets_final/"
 
-    print(f"Starte Verarbeitung der Ordner in: {root_dir_to_process}")
-    print(f"Ausgabe erfolgt nach: {output_directory}")
+    print(f"Starte Skript prepare_data_for_graph.py (Stufe 1 - Zwischenergebnisse)")
     
-    processed_results = process_all_folders(root_dir_to_process, output_directory)
+    # Rufe die modifizierte Funktion auf
+    process_and_save_intermediates(root_dir_to_process, intermediate_directory)
     
-    print("Verarbeitung abgeschlossen.")
+    print("Skript prepare_data_for_graph.py (Stufe 1) beendet.")

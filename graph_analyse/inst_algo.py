@@ -1,14 +1,59 @@
 import os
 import time
 import numpy as np
+import pandas as pd
 from openpyxl import load_workbook
 from mpi4py import MPI
 
 # Eigene Module/Klassen
 from Arroyo_DCDG_PLUT import DCDG_Class
 from MySQL_OPCUA_Datahistorian import createNameList
-from mapping_dict import matching
-import Config
+from MAPPING_DICT import matching
+
+def load_dynamic_weights(modes_base_path):
+    """
+    Liest alle Gewichts-CSVs aus den Modus-Unterordnern ein, bereinigt die ID-Spalte
+    und gibt ein Dictionary mit sauberen DataFrames zurück.
+    """
+    print(f"Lese dynamische Kantengewichte aus: {modes_base_path}")
+    all_weights = {}
+    if not os.path.isdir(modes_base_path):
+        print(f"WARNUNG: Verzeichnis für dynamische Gewichte nicht gefunden: {modes_base_path}")
+        return all_weights
+
+    for mode_folder in os.listdir(modes_base_path):
+        mode_path = os.path.join(modes_base_path, mode_folder)
+        if os.path.isdir(mode_path):
+            try:
+                csv_file_name = next((f for f in os.listdir(mode_path) if f.endswith('.csv')), None)
+                if csv_file_name:
+                    csv_path = os.path.join(mode_path, csv_file_name)
+                    
+                    # --- START DER KORREKTUR ---
+                    
+                    # 1. Lese die CSV-Datei normal ein
+                    df = pd.read_csv(csv_path, delimiter=';', decimal=',')
+                    
+                    # 2. Entferne alle Zeilen, bei denen 'Original_Edge_ID' leer ist (NaN)
+                    df.dropna(subset=['Original_Edge_ID'], inplace=True)
+                    
+                    # 3. Wandle die 'Original_Edge_ID' Spalte in ganze Zahlen (Integer) um
+                    if not df.empty:
+                        df['Original_Edge_ID'] = df['Original_Edge_ID'].astype(int)
+                    
+                    # 4. Setze die jetzt saubere Spalte als Index
+                    df.set_index('Original_Edge_ID', inplace=True)
+
+                    # --- ENDE DER KORREKTUR ---
+
+                    all_weights[mode_folder] = df
+                else:
+                    print(f"WARNUNG: Keine CSV-Datei im Modus-Ordner gefunden: {mode_path}")
+            except Exception as e:
+                print(f"FEHLER beim Lesen und Bereinigen des Modus {mode_folder}: {e}")
+    
+    print(f"{len(all_weights)} Gewichts-Modi erfolgreich geladen.")
+    return all_weights
 
 def process_testcase(case_path, aml_file, dList, dNumbers, reverse_mapping, abort_time, testcase_files):
     """
@@ -21,36 +66,60 @@ def process_testcase(case_path, aml_file, dList, dNumbers, reverse_mapping, abor
         dcdg = DCDG_Class()
         dcdg.generate_graphfromAML(aml_file)
 
-        # 2. Lade die spezifischen Daten des Testfalls unter Verwendung der Konfigurationsnamen
+        # 2. Lade die spezifischen Parquet-Dateien des Testfalls
         path_alarms = os.path.join(case_path, testcase_files['alarms'])
         path_xmv = os.path.join(case_path, testcase_files['xmv'])
         path_residuals = os.path.join(case_path, testcase_files['residuals'])
         path_parameters = os.path.join(case_path, testcase_files['parameters'])
+        path_modi_df = os.path.join(case_path, testcase_files['modi_df'])
 
-        wb_alarms = load_workbook(filename=path_alarms)
-        wb_xmv = load_workbook(filename=path_xmv)
-        wb_residuals = load_workbook(filename=path_residuals)
-        ws_alarms, ws_xmv, ws_residuals = wb_alarms.active, wb_xmv.active, wb_residuals.active
+        # Lese die Parquet-Dateien in Pandas DataFrames
+        df_alarms = pd.read_parquet(path_alarms)
+        df_xmv = pd.read_parquet(path_xmv)
+        df_residuals = pd.read_parquet(path_residuals)
+        df_modi = pd.read_parquet(path_modi_df)
         
-        # 3. Verarbeitungslogik (unverändert)
+        # 3. Verarbeitungslogik angepasst für Pandas DataFrames
         xmv_dict, alarm_dict, deviation_dict = {}, {}, {}
         accumulated_combined_influence_matrix = None
 
-        for tc in range(1, ws_alarms.max_row):
+        # Iteriere über die Zeilen der DataFrames (Annahme: alle haben die gleiche Länge)
+        for tc in range(len(df_alarms)):
+        
+            # 1. Hole den aktuellen Modus (die Zeile mit Nullen und Einsen) aus der modi_df
+            current_mode_values = df_modi.iloc[tc].astype(int).tolist()
+            
+            # 2. Baue den passenden Ordnernamen, z.B. "mode_0_1_0_0_1_0"
+            mode_folder_name = f"mode_{'_'.join(map(str, current_mode_values))}"
+            
+            # 3. Wähle das richtige Gewichts-DataFrame aus dem globalen Dictionary aus
+            if mode_folder_name in all_mode_weights:
+                current_weights_df = all_mode_weights[mode_folder_name]
+                dcdg.update_edge_weights_from_mode(current_weights_df)
+
+            else:
+                # Fallback, falls ein Modus auftritt, für den keine Gewichte geladen wurden
+                print(f"WARNUNG: Modus '{mode_folder_name}' nicht in den geladenen Gewichten gefunden.")
+                
+            # Aktor-Werte aus df_xmv lesen
             for i in range(8): # number_of_actuators
-                val = ws_xmv.cell(row=tc, column=dNumbers[i]).value
+                # .iloc[zeile, spalte] für 0-basierten Zugriff
+                # dNumbers ist 1-basiert, daher dNumbers[i] - 1
+                val = df_xmv.iloc[tc, dNumbers[i] - 1]
                 xmv_dict[dList[10 + i].replace("_State", "")] = (0 if val is None else val) / 100
             dcdg.update_valves(xmv_dict)
 
+            # Alarm-Daten aus df_alarms lesen
             for j in range(10): # number_of_sensors
                 if "AIR" not in dList[j]:
-                    alarm_dict[dList[j].replace("V", "YIC").replace("_", "_Measurement_")] = ws_alarms.cell(row=tc, column=j + 1).value
+                    alarm_dict[dList[j].replace("V", "YIC").replace("_", "_Measurement_")] = df_alarms.iloc[tc, j]
             dcdg.add_sensorlabels(alarm_dict)
             dcdg.set_alarmstates(alarm_dict)
 
+            # Residual-Werte aus df_residuals lesen
             for k in range(10): # number_of_sensors
                 if "AIR" not in dList[k]:
-                    deviation_dict[dList[k].replace("V", "YIC").replace("_", "_Measurement_")] = ws_residuals.cell(row=tc, column=k + 1).value
+                    deviation_dict[dList[k].replace("V", "YIC").replace("_", "_Measurement_")] = df_residuals.iloc[tc, k]
             dcdg.set_deviations(deviation_dict)
 
             if not any(alarm_dict.values()):
@@ -121,31 +190,33 @@ if __name__ == "__main__":
         # --- 1. Pfade zu den globalen Konfigurationsdateien ---
         
         # Pfad zur zentralen AML-Datei, welche die Systemtopologie beschreibt.
-        path_aml_file = "./config/ModVA_Mixer_incl_SensorNamingConvention_reduced_V2.aml"
+        path_aml_file = "/beegfs/home/m/m778332/masterarbeit/Code/Data/models/ModVA_Mixer_incl_SensorNamingConvention_reduced_V2.aml"
 
         # Pfad zur Excel-Datei mit den Bezeichnungen und Mappings.
-        path_designations_file = "./config/ModVA_Designations.xlsx"
+        path_designations_file = "/beegfs/home/m/m778332/masterarbeit/Code/Data/models/ModVA_Designations.xlsx"
+        
+        # Pfad zum Verzeichnis, das ALLE Modus-Ordner enthält
+        dir_dynamic_weights = "/beegfs/home/m/m778332/masterarbeit/Code/Data/mode_parquets_final_dask/weights"
 
         # --- 2. Pfad zum Hauptverzeichnis, das alle Testfall-Ordner enthält ---
         
         # Dies ist das Wurzelverzeichnis, in dem die Ordner 'Testcase1', 'Testcase2' usw. liegen.
-        dir_testcases_root = "./Selected_Testcases/3_ModVA_Mixing_Module"
+        dir_testcases_root = "/beegfs/home/m/m778332/masterarbeit/Code/Data/data_for_aroyyo"
 
         # --- 3. Namen der Dateien, die in JEDEM Testfall-Ordner erwartet werden ---
         
         # Diese Namen sind für alle Testfälle gleich und werden an die process_testcase Funktion übergeben.
         testcase_filenames = {
-            "alarms":    "ModVA_deviation_adjusted.xlsx",
-            "xmv":       "XMV.xlsx",
-            "residuals": "ModVA_residual_adjusted.xlsx",
-            "parameters": "parameters.txt"
+            "alarms":    "ModVA_deviation_adjusted.parquet",
+            "xmv":       "XMV.parquet",
+            "residuals": "ModVA_residual_adjusted.parquet",
+            "parameters": "parameters.txt",
+            "modi_df":    "modi_df.parquet"
         }
 
     # ###########################################################################
     # ### ENDE DER KONFIGURATION                                              ###
     # ###########################################################################
-
-    # Ab hier sollte keine Änderung mehr nötig sein.
     
     init_data = None
     if rank == 0:
@@ -158,6 +229,8 @@ if __name__ == "__main__":
                 # Programm mit Fehlermeldung beenden, wenn wichtige Pfade nicht gefunden werden.
                 print(f"FEHLER: Der konfigurierte Pfad '{path}' wurde nicht gefunden. Bitte die Konfiguration prüfen.")
                 comm.Abort() # Beendet alle MPI-Prozesse
+                
+        all_mode_weights = load_dynamic_weights(dir_dynamic_weights)
 
         # Lade globale Daten
         wb = load_workbook(filename=path_designations_file)
@@ -186,7 +259,8 @@ if __name__ == "__main__":
             "reverse_mapping": reverse_mapping,
             "abort_time": abort_time,
             "testcase_dir_list": testcase_dir_list,
-            "testcase_filenames": testcase_filenames
+            "testcase_filenames": testcase_filenames,
+            "all_mode_weights": all_mode_weights
         }
     
     # 2. Verteile die initialisierten Daten an alle Prozesse
@@ -200,6 +274,7 @@ if __name__ == "__main__":
     abort_time = init_data["abort_time"]
     testcase_dir_list = init_data["testcase_dir_list"]
     testcase_filenames = init_data["testcase_filenames"]
+    all_mode_weights = init_data["all_mode_weights"]
     
     my_cases_to_process = testcase_dir_list[rank::size]
     
