@@ -46,13 +46,12 @@ def read_changed_param(txt_path: str) -> tuple[str, float]:
     return param_name, param_val
 
 
-# ANGEPASSTE Funktion: process_and_save_intermediates
 def process_and_save_intermediates(root_dir: str, intermediate_output_dir: str):
     print(f"Starte Stufe 1: Vorverarbeitung und Speichern von Zwischenergebnissen.")
     print(f"Eingabeverzeichnis: {root_dir}")
     print(f"Ausgabe der Zwischendateien nach: {intermediate_output_dir}")
 
-    os.makedirs(intermediate_output_dir, exist_ok=True) # Stelle sicher, dass das Verzeichnis existiert
+    os.makedirs(intermediate_output_dir, exist_ok=True)
 
     sim_to_graph = defaultdict(list)
     for graph, sim in MAPPING_DICT.matching.items():
@@ -129,10 +128,8 @@ def process_and_save_intermediates(root_dir: str, intermediate_output_dir: str):
                 missing_act_cols = set(PARAMETER_CONFIG.ACTUATORS_FOR_MODI) - set(df_processed.columns)
                 print(f"WARNUNG ({sub}): Nicht alle Aktuator-Spalten ({missing_act_cols}) für Typkonvertierung in df_processed gefunden.")
             
-            # Speichere das optimierte df_processed als einzelne Parquet-Datei
-            # Verwende einen eindeutigen Präfix oder Suffix für diese Zwischendateien
             intermediate_file_path = os.path.join(intermediate_output_dir, f"intermediate__{sub}.parquet")
-            df_processed.to_parquet(intermediate_file_path, index=False) # index=False ist üblich
+            df_processed.to_parquet(intermediate_file_path, index=False)
             print(f"  ✓ Zwischenergebnis gespeichert: {intermediate_file_path}")
 
             del df_processed # Speicher sofort freigeben
@@ -150,24 +147,6 @@ def process_and_save_intermediates(root_dir: str, intermediate_output_dir: str):
 if __name__ == "__main__":
     # Pfade für den Cluster
     root_dir_to_process = "/beegfs/project/ma-kausalegraphen/"
-    # NEU: Ein Verzeichnis für die zwischengespeicherten, optimierten Parquet-Dateien
-    intermediate_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/intermediate_parquets/"
-    
-    # Das finale Ausgabeverzeichnis wird dann vom Dask-Skript verwendet
-    # final_output_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/mode_parquets_final/"
-
-    print(f"Starte Skript prepare_data_for_graph.py (Stufe 1 - Zwischenergebnisse)")
-    
-    # Rufe die modifizierte Funktion auf
-    process_and_save_intermediates(root_dir_to_process, intermediate_directory)
-    
-    print("Skript prepare_data_for_graph.py (Stufe 1) beendet.")
-
-
-if __name__ == "__main__":
-    # Pfade für den Cluster
-    root_dir_to_process = "/beegfs/project/ma-kausalegraphen/"
-    # NEU: Ein Verzeichnis für die zwischengespeicherten, optimierten Parquet-Dateien
     intermediate_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/intermediate_parquets/"
     
     # Das finale Ausgabeverzeichnis wird dann vom Dask-Skript verwendet

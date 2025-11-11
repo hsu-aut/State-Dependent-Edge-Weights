@@ -280,8 +280,6 @@ def process_single_parquet(parquet_path: Path, output_dir: Path):
             
     finally:
         # 4. Aufräumen: Temporäre Memmap-Datei wird immer gelöscht
-        # Dieser Block wird auch dann ausgeführt, wenn im try-Block ein Fehler auftritt.
-        # Wichtig, um die Festplatte nicht mit temporären Dateien zu füllen.
         if df_flat is not None: del df_flat
         if flat_array_on_disk is not None: del flat_array_on_disk
         gc.collect()

@@ -38,14 +38,13 @@ class DBNConverter:
         self._param_vids_in_sub: List[int] = []
         
         # Layout related attributes
-        self._raw_layout: Optional[ig.Layout] = None # Initialized on first use or in __init__
-        self._layout2d: Optional[List[List[float]]] = None # Scaled layout coordinates
+        self._raw_layout: Optional[ig.Layout] = None
+        self._layout2d: Optional[List[List[float]]] = None
 
-        # It's often better to compute raw layout once, e.g., here or on first demand
         if self.sub.vcount() > 0:
             self._raw_layout = self.sub.layout("fr")
         else:
-            self._raw_layout = ig.Layout([]) # Empty layout for empty graph
+            self._raw_layout = ig.Layout([])
 
 
     def _prepare_node_definitions(self, sensor_vids: List[int], param_vids: List[int]):
@@ -104,8 +103,6 @@ class DBNConverter:
                     self.dbn_edge_to_original_graph_eid_map[dbn_edge] = original_graph_eid
         
         # Selbst-Transitionen für Sensoren haben keine direkte Entsprechung
-        # zu einer einzelnen Kante im Ursprungsgraph. Man könnte sie ignorieren
-        # oder ihnen einen speziellen Marker (z.B. -1 oder None) zuweisen.
         for v_id in sensor_vids:
             if v_id not in vid_to_tag_map: continue
             tag_u = vid_to_tag_map[v_id]
@@ -114,9 +111,6 @@ class DBNConverter:
             dbn_edge = (src_node, dst_node)
             if dbn_edge not in self._all_dbn_edges_collected: # vermeide Duplikate falls u_vid == v_vid oben
                 self._all_dbn_edges_collected.append(dbn_edge)
-                # Hier könntest du auch eine ID zuweisen, falls gewünscht, z.B.:
-                # if dbn_edge not in self.dbn_edge_to_original_graph_eid_map:
-                #     self.dbn_edge_to_original_graph_eid_map[dbn_edge] = -1 # Markierung für Self-Loops
 
 
     def _collect_parameter_edges(self, param_vids: List[int], sensor_vids: List[int]):

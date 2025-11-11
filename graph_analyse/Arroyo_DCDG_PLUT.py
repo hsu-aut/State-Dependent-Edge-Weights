@@ -24,9 +24,6 @@ class Valve:
         Args:
             Tag (str): Eindeutige Kennung (Tag) des Ventils.
         """
-        # Dieser Wert war bisher hartcodiert auf 1. Falls du 
-        # in Zukunft eine längere History nutzen möchtest, 
-        # kannst du ihn erweitern oder als Parameter übergeben.
         self.history_length = 3  
         
         # History der Zustände (z.B. Öffnungsgrade), startet mit 0.5 als Beispiel.
@@ -109,7 +106,6 @@ class Valve:
                 # z.B. wenn hist_val=0.5 und history_length=1 => scaled_val=0.5
                 scaled_val = int(np.round(hist_val * self.history_length))
                 
-                # Neue (optimierte) Logik:
                 # Skaliere hist_val (0..1 oder 0..50?) auf den Indexbereich des Kernels
                 if scaled_val < 0:
                     hist_index = 0

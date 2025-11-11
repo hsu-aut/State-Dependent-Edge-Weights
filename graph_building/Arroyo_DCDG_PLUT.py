@@ -24,9 +24,6 @@ class Valve:
         Args:
             Tag (str): Eindeutige Kennung (Tag) des Ventils.
         """
-        # Dieser Wert war bisher hartcodiert auf 1. Falls du 
-        # in Zukunft eine längere History nutzen möchtest, 
-        # kannst du ihn erweitern oder als Parameter übergeben.
         self.history_length = 3  
         
         # History der Zustände (z.B. Öffnungsgrade), startet mit 0.5 als Beispiel.
@@ -109,7 +106,6 @@ class Valve:
                 # z.B. wenn hist_val=0.5 und history_length=1 => scaled_val=0.5
                 scaled_val = int(np.round(hist_val * self.history_length))
                 
-                # Neue (optimierte) Logik:
                 # Skaliere hist_val (0..1 oder 0..50?) auf den Indexbereich des Kernels
                 if scaled_val < 0:
                     hist_index = 0
@@ -224,6 +220,33 @@ class DCDG_Class:
         self.NumberOfElements = 0
         # Leeren, gerichteten Graphen anlegen
         self.g = ig.Graph(intVertexNumber, directed=True)
+        
+    def update_edge_weights_from_mode(self, weights_df):
+        """
+        Aktualisiert die Kantengewichte des Graphen basierend auf einem DataFrame
+        für den aktuellen Betriebsmodus.
+        """
+    
+    
+        # Iteriere direkt über die Zeilen des Gewichts-DataFrames.
+        # 'original_edge_id' ist hier der Index des DataFrames.
+        for original_edge_id, row in weights_df.iterrows():
+            try:
+                # Lese die neuen Gewichte aus der aktuellen Zeile
+                new_weight = row['MI_mit_Var_Xi']
+                new_mi = row['MI_mit_Var_Xi']
+    
+                # Greife direkt über den Index auf die Kante im Graphen zu
+                # und aktualisiere ihre Attribute.
+                edge = self.g.es[original_edge_id]
+                edge['weight'] = new_weight
+    
+            except IndexError:
+                # print(f"Warnung: Kanten-ID {original_edge_id} existiert nicht im Graphen.")
+                pass
+            except KeyError:
+                # print(f"Warnung: Spalten für Kante {original_edge_id} nicht vollzählig.")
+                pass
 
     def add_myvertex(self, in_tag, in_carriertype, in_amlID, in_alarmtag, in_alarmstate, in_alarmlimits, in_deviation):
         """

@@ -2,11 +2,8 @@ import dask.dataframe as dd
 import pandas as pd # Wird hier nur für kleine Teile oder Typ-Annotationen benötigt
 import os
 import shutil # Optional, zum Aufräumen
-import PARAMETER_CONFIG # Ihre Konfigurationsdatei
+import PARAMETER_CONFIG 
 import gc
-
-# Ggf. Ihre optimize_df_dtypes Funktion hierher kopieren oder importieren, 
-# falls Sie sie auch auf die finalen Gruppen anwenden wollen (oft nicht nötig, wenn Eingabe gut ist)
 
 def create_final_modes_with_dask(intermediate_dir: str, final_output_dir: str):
     print(f"\nStarte Stufe 2: Dask-Verarbeitung der Zwischenergebnisse.")
@@ -22,11 +19,9 @@ def create_final_modes_with_dask(intermediate_dir: str, final_output_dir: str):
 
     # 1. Lese alle zwischengespeicherten Parquet-Dateien als Dask DataFrame
     # Dask ist "lazy" und lädt die Daten nicht sofort komplett in den Speicher.
-    # Stellen Sie sicher, dass PyArrow oder FastParquet in Ihrer Conda-Umgebung installiert ist.
     print("Lese Parquet-Dateien aus dem Zwischenverzeichnis mit Dask...")
     try:
         # Das Schema der Zwischendateien sollte durch Stufe 1 konsistent sein.
-        # engine='pyarrow' ist oft eine gute Wahl.
         # Das Muster "intermediate__*.parquet" passt zu den in Stufe 1 gespeicherten Dateien.
         ddf = dd.read_parquet(os.path.join(intermediate_dir, "intermediate__*.parquet"), engine='pyarrow')
     except Exception as e:
@@ -35,8 +30,6 @@ def create_final_modes_with_dask(intermediate_dir: str, final_output_dir: str):
         
     print(f"Dask DataFrame erfolgreich geladen. Spalten: {list(ddf.columns)}")
     print(f"Dask DataFrame hat geschätzt {ddf.npartitions} Partitionen.")
-    # ddf.head() würde die ersten paar Zeilen laden und anzeigen (kostet etwas I/O)
-    # print("Dask DataFrame Head (Beispiel):\n", ddf.head())
 
 
     # 2. Definiere die Spalten für das Grouping
@@ -98,12 +91,6 @@ def create_final_modes_with_dask(intermediate_dir: str, final_output_dir: str):
             # Filtere das Dask DataFrame, um nur die aktuelle Gruppe zu erhalten
             group_ddf = ddf[current_filter_condition]
             
-            # Speichere diese Gruppe.
-            # .compute() würde die Gruppe als Pandas DataFrame in den Speicher holen.
-            # Wenn einzelne Gruppen immer noch sehr groß sind, kann dies fehlschlagen.
-            # Besser: Dask DataFrame direkt speichern lassen.
-            # to_parquet für ein Dask DataFrame schreibt ein Verzeichnis mit Parquet-Dateien.
-            # Wenn Sie EINE Datei pro Gruppe wollen und die Gruppe in den RAM passt:
             if not group_ddf.map_partitions(len).compute().sum() == 0: # Prüfen, ob die Gruppe Daten enthält
                 group_pdf = group_ddf.compute() # Holt die Gruppe als Pandas DataFrame
                 # Optional: optimize_df_dtypes(group_pdf.copy(), f"group_pdf_{mode_name}")
@@ -119,8 +106,6 @@ def create_final_modes_with_dask(intermediate_dir: str, final_output_dir: str):
         except MemoryError:
             print(f"  FATAL: MemoryError beim Berechnen (.compute()) oder Speichern der Gruppe {mode_name}.")
             print(f"  Diese einzelne Mode-Gruppe ist zu groß für den verfügbaren Speicher ({mode_name}).")
-            # Hier könnte man versuchen, group_ddf.to_parquet(output_file_path + "_dask_partitioned") zu verwenden,
-            # um die Gruppe partitioniert durch Dask schreiben zu lassen, falls .compute() fehlschlägt.
         except Exception as e:
             print(f"  FEHLER beim Verarbeiten oder Speichern der Gruppe {mode_name}: {e} (Typ: {type(e).__name__})")
 
@@ -136,7 +121,6 @@ def create_final_modes_with_dask(intermediate_dir: str, final_output_dir: str):
 
 if __name__ == '__main__':
     # Pfade für den Cluster (Beispiele, bitte anpassen)
-    # Stellen Sie sicher, dass PARAMETER_CONFIG.py für dieses Skript erreichbar ist
     
     # Das Verzeichnis, in das Stufe 1 die optimierten Parquet-Dateien geschrieben hat
     intermediate_files_directory = "/beegfs/home/m/m778332/masterarbeit/Code/Data/intermediate_parquets/"

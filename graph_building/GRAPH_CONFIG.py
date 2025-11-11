@@ -1,1 +1,1 @@
-AML_FILE_PATH = r'C:\Users\Moritz\Desktop\Master\Code\Data\models\ModVA_Mixer_incl_SensorNamingConvention_reduced.aml'
+AML_FILE_PATH = r'/beegfs/home/m/m778332/masterarbeit/Code/Data/models/ModVA_Mixer_incl_SensorNamingConvention_reduced.aml'

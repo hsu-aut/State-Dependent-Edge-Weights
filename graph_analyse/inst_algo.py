@@ -28,23 +28,15 @@ def load_dynamic_weights(modes_base_path):
                 csv_file_name = next((f for f in os.listdir(mode_path) if f.endswith('.csv')), None)
                 if csv_file_name:
                     csv_path = os.path.join(mode_path, csv_file_name)
-                    
-                    # --- START DER KORREKTUR ---
-                    
-                    # 1. Lese die CSV-Datei normal ein
+
                     df = pd.read_csv(csv_path, delimiter=';', decimal=',')
-                    
-                    # 2. Entferne alle Zeilen, bei denen 'Original_Edge_ID' leer ist (NaN)
+
                     df.dropna(subset=['Original_Edge_ID'], inplace=True)
-                    
-                    # 3. Wandle die 'Original_Edge_ID' Spalte in ganze Zahlen (Integer) um
+
                     if not df.empty:
                         df['Original_Edge_ID'] = df['Original_Edge_ID'].astype(int)
-                    
-                    # 4. Setze die jetzt saubere Spalte als Index
-                    df.set_index('Original_Edge_ID', inplace=True)
 
-                    # --- ENDE DER KORREKTUR ---
+                    df.set_index('Original_Edge_ID', inplace=True)
 
                     all_weights[mode_folder] = df
                 else:
@@ -184,8 +176,6 @@ if __name__ == "__main__":
     # ###########################################################################
     
     # Pfade werden nur von rank 0 gelesen und dann an alle verteilt.
-    # Verwende am besten relative Pfade (startend mit ./) oder absolute Pfade 
-    # des Cluster-Dateisystems (startend mit /).
     if rank == 0:
         # --- 1. Pfade zu den globalen Konfigurationsdateien ---
         
@@ -200,7 +190,7 @@ if __name__ == "__main__":
 
         # --- 2. Pfad zum Hauptverzeichnis, das alle Testfall-Ordner enthält ---
         
-        # Dies ist das Wurzelverzeichnis, in dem die Ordner 'Testcase1', 'Testcase2' usw. liegen.
+        # Dies ist das rootverzeichnis, in dem die Ordner 'Testcase1', 'Testcase2' usw. liegen.
         dir_testcases_root = "/beegfs/home/m/m778332/masterarbeit/Code/Data/data_for_aroyyo"
 
         # --- 3. Namen der Dateien, die in JEDEM Testfall-Ordner erwartet werden ---
