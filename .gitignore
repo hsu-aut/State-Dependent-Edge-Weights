@@ -4,3 +4,5 @@ Test_Data/
 *.parquet
 *.feather
 *.pkl
+__pycache__/
+*.pyc
