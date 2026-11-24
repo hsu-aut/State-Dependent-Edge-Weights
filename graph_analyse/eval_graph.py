@@ -100,11 +100,14 @@ def process_single_parquet(parquet_path: Path, output_dir: Path):
             current_col_idx += 1
         print(f"{len(sensor_base_tags_in_model)*2} Sensor-Spalten in Memmap-Datei geschrieben.")
 
+        # Parameter columns are filled with the per-row values, like the sensor columns. A mode file pools the
+        # rows of all simulation runs, so the parameter values differ between runs; filling the column with the
+        # value of the first row (previous version) made every parameter constant within an operating state,
+        # which gave KL weight 0 and meaningless regression coefficients for all parameter edges.
         for tag in param_base_tags_in_model_for_selection:
-            param_val = df_raw[tag].iloc[0]
-            flat_array_on_disk[:, current_col_idx] = param_val
+            flat_array_on_disk[:, current_col_idx] = df_raw[tag].iloc[:-1].values
             current_col_idx += 1
-            flat_array_on_disk[:, current_col_idx] = param_val
+            flat_array_on_disk[:, current_col_idx] = df_raw[tag].iloc[1:].values
             current_col_idx += 1
         print(f"{len(param_base_tags_in_model_for_selection)*2} Parameter-Spalten in Memmap-Datei geschrieben.")
             
