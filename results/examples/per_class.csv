@@ -1,0 +1,13 @@
+config,group,n,mean_rank,median_rank,top5
+heuristic_uniform,pipe: diameter,2,17.5,17.5,0.5
+heuristic_uniform,deviation |dev| <= 5%,0,,,
+heuristic_uniform,deviation 5-15%,1,2.0,2.0,1.0
+heuristic_uniform,deviation 15-25%,1,33.0,33.0,0.0
+beta,pipe: diameter,2,7.5,7.5,0.0
+beta,deviation |dev| <= 5%,0,,,
+beta,deviation 5-15%,1,7.0,7.0,0.0
+beta,deviation 15-25%,1,8.0,8.0,0.0
+kl,pipe: diameter,2,14.5,14.5,0.5
+kl,deviation |dev| <= 5%,0,,,
+kl,deviation 5-15%,1,27.0,27.0,0.0
+kl,deviation 15-25%,1,2.0,2.0,1.0

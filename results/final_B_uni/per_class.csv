@@ -1,0 +1,6 @@
+config,group,n,mean_rank,median_rank,top5
+heuristic_uniform,pipe: diameter,2394,20.093984962406015,17.0,0.21929824561403508
+heuristic_uniform,pipe: roughness,25,23.32,22.0,0.0
+heuristic_uniform,deviation |dev| <= 5%,856,18.643691588785046,17.0,0.23481308411214954
+heuristic_uniform,deviation 5-15%,1338,20.142750373692078,15.5,0.21898355754857998
+heuristic_uniform,deviation 15-25%,219,25.301369863013697,20.0,0.1415525114155251
