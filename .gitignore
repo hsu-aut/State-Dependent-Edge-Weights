@@ -6,3 +6,4 @@ Test_Data/
 *.pkl
 __pycache__/
 *.pyc
+!results/**/*.csv
