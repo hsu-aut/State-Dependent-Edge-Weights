@@ -1,27 +1,89 @@
-Temporal Weighting for Causal Graphs
+# State-dependent Edge Weights for Causal Graphs
 
-Dieses Projekt implementiert einen Workflow zur Erstellung und Analyse von zeitlich gewichteten kausalen Graphen. Das System liest eine Topologie aus einer AML-Datei, verarbeitet Simulationsdaten und nutzt ein Dynamisches Bayes'sches Netzwerk (DBN), um die Kausalzusammenhänge in Form von Kantengewichten zu quantifizieren.
+Code and evaluation results for the paper
 
-Funktionsweise
+> **Method for Integrating State-dependent Edge Weights into Causal Graphs for Localizing Deviating Model Parameters**
+> submitted to *at – Automatisierungstechnik* (manuscript auto-2026-0162, revised version).
 
-Der Prozess gliedert sich in mehrere Hauptschritte:
+The method learns edge weights for an expert-defined directed causal graph from simulation data. The data are segmented into operating states by the valve positions. For each state, a two-slice time-varying dynamic Bayesian network (TV-DBN) is fitted as a linear Gaussian Bayesian network, and the edge weights are computed as KL divergence (or, for comparison, as absolute regression coefficients). The weights are mapped back to the original graph and used in the graph-based root-cause localization of Ramonat et al. (2024).
 
-    Graph-Erstellung: Aus einer AML-Datei wird ein kausaler Graph der Systemtopologie erstellt. Hierarchische und prozesstechnische Verbindungen werden dabei berücksichtigt.
+This repository continues [hsu-aut/Temporal-Weighting-for-Causal-Graphs](https://github.com/hsu-aut/Temporal-Weighting-for-Causal-Graphs) (commit `34b76f9`, history included) and adds the corrections and the complete re-evaluation of the revised paper.
 
-    Datenaufbereitung: Simulations-Rohdaten aus Parquet-Dateien werden aufbereitet. Dies umfasst das Einlesen, die Harmonisierung von Zeitstempeln und die Auswahl relevanter Sensor- und Aktuatordaten.
+## Contents
 
-    DBN-Konstruktion: Der statische Graph wird in ein Dynamisches Bayes'sches Netzwerk umgewandelt. Dabei werden Sensor- und Parameterknoten auf zwei Zeitebenen (t-1 und t) abgebildet, um zeitliche Abhängigkeiten zu modellieren.
+| Folder | Content |
+|---|---|
+| `simulation/` | Simulation of the fault runs with OpenModelica via OMPython (one parameter varied per run) |
+| `data_preparation/` | Mapping of simulation variables to graph vertices, segmentation into operating states (Dask), nominal parameter values (`PARAMETER_CONFIG.py`) |
+| `graph_building/`, `graph_analyse/` | Causal graph from AutomationML (`Arroyo_DCDG_PLUT.py`), TV-DBN construction, weight computation (`graph_analyse/eval_graph.py`), original diagnosis driver (`graph_analyse/inst_algo.py`) |
+| `graph_operations/` | Earlier in-memory version of the weight computation (not used for the paper) |
+| `evaluation/` | Re-evaluation of the revised paper: reference run, test-case generation, train/test split, weight computation, diagnosis per test case, statistics (see below) |
+| `results/` | Per-test-case results and summary tables of the revised paper |
 
-    Modell-Fitting und Gewichtung: Ein LinearGaussianBayesianNetwork wird auf die aufbereiteten Daten gefittet. Anschließend werden die Kantengewichte, unter anderem mittels KL-Divergenz, berechnet, um die Stärke der kausalen Einflüsse zu quantifizieren.
+The simulation data (approx. 15,000 runs, 59 GB of mode files) and the AutomationML models are not part of the repository (`Data/` is excluded). The scripts in `evaluation/` default to their locations on the HSUper cluster of Helmut Schmidt University; all paths can be set on the command line.
 
-Projektstruktur
+## Corrections in the revised version
 
-Das Projekt ist in mehrere Module unterteilt:
+The re-evaluation for the revision found the following problems in the original evaluation. All results in the revised paper were recomputed after correcting them.
 
-    graph_building/: Enthält Skripte zur Erstellung des Graphen aus der AML-Datei (Arroyo_DCDG_PLUT.py) und zur Konstruktion des DBN (dbn_constructer.py).
+1. **Parameter columns of the training data** (`graph_analyse/eval_graph.py`): parameter columns of the two-slice table were filled with the value of the first row of a mode file. Since a mode file pools all runs, every parameter was constant within an operating state, so the KL weights of all parameter edges were 0 and their regression coefficients meaningless. Fixed in this repository (per-row values, as for the sensors).
+2. **Reference run**: the fault-free reference used to compute the residuals followed a different actuator schedule than the fault runs. A new reference run with the same model, solver settings, and schedule was simulated (`evaluation/sim_reference.py`), and all test cases were regenerated (`evaluation/regen_testcases.py`).
+3. **Deviation detection**: with the correct reference, the original threshold of 5 % detects almost no faults. Deviations are now flagged at 0.2 % of the sensor range with a persistence of 3 s, and closed-valve pressures of V201–V203 are masked (justification in Section 6.1 of the paper; analyses in `evaluation/threshold_sweep.py`, `detectability.py`, `noise_vs_signal.py`).
+4. **Path search**: the path search skips edges with weight ≤ 0.01, which removed many learned edges. The threshold is now applied only to valve edges (`--prune valves` in `evaluation/step2_eval_cases.py`); results of the knowledge-based weighting are unchanged by this.
+5. **Evaluation protocol**: ties are resolved by midpoint ranks, and the weights are learned on one half of the runs (even sweep index) and evaluated on the other half (odd sweep index).
 
-    graph_operations/: Beinhaltet die Logik zum Fitten des Modells und zur Berechnung der Kantengewichte (eval_graph.py).
+Known discrepancies that could not be resolved from the available material:
+- `data_preparation/parameter_values.py` generates equidistant parameter values, whereas the stored runs are approximately normally distributed around the nominal value (standard deviation about 8.3 %). The paper describes the values as they occur in the data.
+- Tank parameters are listed in the sweep configuration, but no tank runs exist in the simulation data.
+- `graph_analyse/inst_algo.py` uses the AML model `..._reduced_V2.aml` (102 candidates), whereas the weights and the paper use `..._reduced.aml` (81 candidates). The evaluation uses `evaluation/step2_eval_cases.py` with the `--aml` option instead.
 
-    data_preparation/: Skripte zur Aufbereitung, Konfiguration (PARAMETER_CONFIG.py) und zum Mapping (MAPPING_DICT.py) der Rohdaten.
+## Reproducing the evaluation
 
-    simulation/: Enthält Konfigurationen und Skripte zur Durchführung von Simulationen, die als Datengrundlage dienen.
+Requirements: Python 3.11 with numpy, pandas, pyarrow, scipy, scikit-learn, pgmpy, igraph, networkx, pyvis, openpyxl; OpenModelica 1.25.0 (container image `openmodelica/openmodelica:v1.25.0-ompython`) with Modelica Standard Library 4 for the reference run. The SLURM job scripts were written for HSUper (`small` partition, 72 cores per node).
+
+Steps (run from `evaluation/`; each script documents its arguments in its header):
+
+| Step | Script | Output |
+|---|---|---|
+| 1. Reference run of the nominal model | `sim_reference.py`, `job_sim_ref.sh` (`npy_to_json.py` converts the sweep file) | nominal result CSV |
+| 2. Validate the reference against fault runs | `check_reference.py`, `compare_runs.py`, `inspect_pressure.py` | console |
+| 3. Generate the test cases | `regen_testcases.py`, `job_regen.sh` with `MASK=1 THR=0.002 PERSIST=3` | `testcases_v4/` |
+| 4. Choose threshold and persistence | `threshold_sweep.py`, `detectability.py`, `noise_vs_signal.py`, `check_testcases.py` | console |
+| 5. Observable test cases per parameter type | `diag_by_type.py --out diagnosable_v4.csv`, `effect_check.py` | `diagnosable_v4.csv` |
+| 6. Split runs into halves A/B | `split_modes.py`, `job_split.sh` | mode files of half A, `split_A.csv`, `split_B.csv`, `diagnosable_v4_B.csv` |
+| 7. Edge weights per operating state | `step0_weights_fixed.py`, `job_weights.sh` with `MODESDIR=<half A> OUT=weights_A` | `weights_A/` |
+| 8. Diagnosis per test case | `step2_eval_cases.py`, `job_eval.sh` (settings below) | `cases_<config>.csv` |
+| 9. Statistics | `final_eval.py`, `heldout_eval.py`, `step3_analyze.py` | `results/summary/` |
+
+Settings of the final evaluation (step 8), one job per row:
+
+```bash
+C="AML=<Data/models>/ModVA_Mixer_incl_SensorNamingConvention_reduced.aml,WEIGHTS=$PWD/weights_A,TESTCASES=$PWD/testcases_v4,INCLUDE=$PWD/diagnosable_v4_B.csv,IDAGG=max,WMAP=exp,PRUNE=valves"
+sbatch --export=ALL,$C,CONFIGS="kl beta",PPRIOR=uniform,OUT=final_B job_eval.sh
+sbatch --export=ALL,$C,CONFIGS="heuristic_uniform",PPRIOR=uniform,OUT=final_B_uni job_eval.sh
+sbatch --export=ALL,$C,CONFIGS="heuristic",PPRIOR=code,OUT=final_B_code job_eval.sh
+```
+
+`IDAGG=max` assigns the larger weight when two TV-DBN edges map to the same original edge, `WMAP=exp` maps the learned weights to [0, 1) by 1 − exp(−w), and `PRUNE=valves` restricts the pruning to valve edges. The tables of the paper are then obtained with
+
+```bash
+python final_eval.py --results ../results --out summary
+python heldout_eval.py ../results
+```
+
+## Results
+
+`results/` contains the per-test-case results of the revised paper (one row per test case: rank, best/worst rank over ties, causal values, top-ranked candidate, SAE):
+
+| Folder | Content |
+|---|---|
+| `final_B/`, `final_B_uni/`, `final_B_code/` | 2,419 observable test cases of half B; KL and regression coefficients, knowledge-based weighting with uniform and with expert prior |
+| `heldout_B_weightsA/`, `heldout_B_weightsAll/` | Check on 200 half-B cases: weights learned on half A vs. on all runs |
+| `examples/` | The two example test cases of the paper, with the full causal-value matrix per candidate and sensor (`debug/`) |
+| `summary/` | Main table, pairwise Wilcoxon tests (Holm-corrected), breakdown by true cause and deviation magnitude |
+
+Main result (mean midpoint rank of the true cause among 81 candidates, lower is better): KL divergence 8.28, regression coefficients 7.55, knowledge-based weighting 20.03 (uniform prior) and 15.21 (expert prior), random ranking 41.
+
+## License
+
+MIT, see `LICENSE`.
