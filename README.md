@@ -28,7 +28,7 @@ The re-evaluation for the revision found the following problems in the original 
 
 1. **Parameter columns of the training data** (`graph_analyse/eval_graph.py`): parameter columns of the two-slice table were filled with the value of the first row of a mode file. Since a mode file pools all runs, every parameter was constant within an operating state, so the KL weights of all parameter edges were 0 and their regression coefficients meaningless. Fixed in this repository (per-row values, as for the sensors).
 2. **Reference run**: the fault-free reference used to compute the residuals followed a different actuator schedule than the fault runs. A new reference run with the same model, solver settings, and schedule was simulated (`evaluation/sim_reference.py`), and all test cases were regenerated (`evaluation/regen_testcases.py`).
-3. **Deviation detection**: with the correct reference, the original threshold of 5 % detects almost no faults. Deviations are now flagged at 0.2 % of the sensor range with a persistence of 3 s, and closed-valve pressures of V201–V203 are masked (justification in Section 6.1 of the paper; analyses in `evaluation/threshold_sweep.py`, `detectability.py`, `noise_vs_signal.py`).
+3. **Deviation detection**: with the correct reference, the original threshold of 5 % detects almost no faults. Deviations are now flagged at 0.2 % of the sensor range with a persistence of 3 s, and closed-valve pressures of V201–V203 are masked (see [Deviation detection](#deviation-detection)).
 4. **Path search**: the path search skips edges with weight ≤ 0.01, which removed many learned edges. The threshold is now applied only to valve edges (`--prune valves` in `evaluation/step2_eval_cases.py`); results of the knowledge-based weighting are unchanged by this.
 5. **Evaluation protocol**: ties are resolved by midpoint ranks, and the weights are learned on one half of the runs (even sweep index) and evaluated on the other half (odd sweep index).
 
@@ -36,6 +36,18 @@ Known discrepancies that could not be resolved from the available material:
 - `data_preparation/parameter_values.py` generates equidistant parameter values, whereas the stored runs are approximately normally distributed around the nominal value (standard deviation about 8.3 %). The paper describes the values as they occur in the data.
 - Tank parameters are listed in the sweep configuration, but no tank runs exist in the simulation data.
 - `graph_analyse/inst_algo.py` uses the AML model `..._reduced_V2.aml` (102 candidates), whereas the weights and the paper use `..._reduced.aml` (81 candidates). The evaluation uses `evaluation/step2_eval_cases.py` with the `--aml` option instead.
+
+## Deviation detection
+
+Each test case compares a fault run with the fault-free reference run of the nominal model (same actuator schedule). For every sensor, the residual is the difference between both runs divided by the maximum absolute reference value of the sensor, on a 1 s grid. A sensor counts as deviating at time *t* if the absolute residual has exceeded 0.002 (0.2 % of the maximum reference value) with the same sign during the last three time steps *t*−2, …, *t*. The deviation is recorded as +1 or −1 according to this sign, and as 0 otherwise. Test cases are generated with `evaluation/regen_testcases.py` (`job_regen.sh` with `MASK=1 THR=0.002 PERSIST=3`).
+
+**Masking of closed-valve pressures.** The pressures downstream of the tank outlet valves V201–V203 are not evaluated while the respective valve is closed (residual and deviation set to 0, `--mask-closed-valves`). The enclosed pipe section is then hydraulically isolated, and its pressure is numerically ill-defined in the simulation, with differences of up to 80 % between runs that otherwise agree (`evaluation/inspect_pressure.py`). The effect was found at V201 and V202; V203 is masked for consistency.
+
+**Choice of threshold and persistence** (`evaluation/detectability.py`, `noise_vs_signal.py`, `threshold_sweep.py`):
+- *Fault-free baseline.* 157 test cases have a parameter that deviates by less than 0.1 % from its nominal value and are therefore practically fault-free. Their residuals show isolated spikes of one time step of up to a few percent at fixed instants close to valve switching, but no persistent deviations.
+- *Persistence.* With a persistence of three time steps, none of these 157 cases shows a deviation at any threshold between 0.1 % and 5 % (one-sided 95 % upper confidence bound of the false-alarm rate: 1.9 %). The persistence thus separates the numerical spikes from parameter effects.
+- *Threshold.* The threshold determines which faults can be detected at all. For most parameter types, the effects on the sensors remain well below 1 % of the sensor range. With a threshold of 5 % (as in the original evaluation) and the same persistence, only 7.6 % of the faults with a deviation of at least 10 % would be detected, compared with 38 % at 0.2 % (stratified sample of 3,000 test cases).
+- *Lower limit.* The residuals are stored with a resolution of 10⁻³. The threshold of 0.2 % is the smallest value that lies clearly above this resolution.
 
 ## Reproducing the evaluation
 
